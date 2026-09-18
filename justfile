@@ -42,6 +42,4 @@ cua-webapp-test:
 	$date = Get-Date -Format "yyyy-MM-dd"; $md = "reports/cua-admiral-$date.md"; if (Test-Path $md) { Copy-Item $md "D:/Dev/repos/mcp-central-docs/reports/" -Force; Write-Host "Synced $md to mcd" }
 
 build-native:
-	$env:Path = "$env:USERPROFILE\.cargo\bin;$env:Path"
-	Set-Location "{{justfile_directory()}}/src-tauri"
-	powershell -NoProfile -ExecutionPolicy Bypass -File "src-tauri/build.ps1"
+	$env:Path = "$env:USERPROFILE\.cargo\bin;$env:Path"; Set-Location "{{justfile_directory()}}/src-tauri"; powershell -NoProfile -ExecutionPolicy Bypass -File "src-tauri/build.ps1"
