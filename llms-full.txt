@@ -1,0 +1,303 @@
+# admiral-mcp — Full Reference
+
+## What
+admiral-mcp is a FastMCP 3.2+ server that bridges AI agent harnesses
+(OpenCode, Claude Code, Cursor) to an iOS device ("Admiral Pager") via
+Apple Push Notification service (APNs).
+
+The server runs on the dev machine (Windows), binds to localhost or
+Tailscale, and exposes:
+- MCP transport at `/mcp` (5 tools)
+- Relay REST at `/relay/*` (iOS app callback endpoints)
+- Health/diagnostics API at `/api/v1/*` (dashboard consumer)
+
+## Tools
+
+### register_run(run_id, repo, phases, harness)
+Harness announces a new multi-phase job. Creates a run record in SQLite.
+Returns `{"success": true, "run_id": "..."}`.
+
+### update_progress(run_id, phase, cost, status)
+Advance to the next phase. Sends a Live Activity push to the iOS device
+if APNs is configured. Status must be one of: queued, running,
+awaiting_approval, complete, failed, cancelled.
+
+### request_approval(run_id, summary, diff_ref?, diff_content?)
+Request human approval. Sends an actionable APNs alert push with
+Approve/Deny buttons. BLOCKS until the iOS app responds or timeout
+(default 300s). Returns approve/deny/timeout.
+
+### resolve_approval(approval_id, decision)
+Called by the relay when the phone answers. One-shot — replay-protected.
+Unblocks the waiting request_approval call.
+
+### get_diff(diff_ref)
+Serves stored diff content by reference. Used by the iOS app to show
+what changes are being approved.
+
+## REST API
+
+### Health & Diagnostics
+
+- `GET /api/v1/health` — KPI snapshot:
+  ```json
+  {"status":"ok","server":"admiral-mcp","version":"0.1.0",
+   "uptime_seconds":123,"tool_count":5,"runs_count":42,
+   "pending_approvals":3,"providers":{}}
+  ```
+
+- `GET /api/v1/diagnostics` — Full system report:
+  ```json
+  {"status":"ok","server":"admiral-mcp","version":"0.1.0",
+   "uptime_seconds":123,"tool_count":5,"runs_count":42,
+   "pending_approvals":3,
+   "tools":[{"name":"register_run"},...],
+   "system":{"windows":true,"python":true},
+   "recent_runs":[...],
+   "pending_approval_items":[...],
+   "errors":[]}
+  ```
+
+### Relay REST Endpoints
+
+All endpoints require Bearer token auth (`ADMIRAL_RELAY_TOKEN`).
+
+- `POST /relay/approve` — body: `{"approval_id": "..."}`
+  → `{"status":"ok","approval_id":"...","decision":"approve"}`
+- `POST /relay/deny` — body: `{"approval_id": "..."}`
+  → `{"status":"ok","approval_id":"...","decision":"deny"}`
+- `GET /relay/diff/{diff_ref}` — returns plain text diff
+  → `404 {"error":"no diff content for: ..."}` if not found
+
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| ADMIRAL_HOST | 127.0.0.1 | Bind address (use Tailscale IP for phone access) |
+| ADMIRAL_PORT | 11089 | Server port |
+| ADMIRAL_RELAY_TOKEN | admin | Bearer token for relay auth |
+| ADMIRAL_APPROVAL_TIMEOUT | 300 | Max wait for approval (seconds) |
+| ADMIRAL_DATA_DIR | data/admiral_mcp | SQLite database directory |
+| ADMIRAL_APNS_KEY_PATH | — | Path to .p8 key file |
+| ADMIRAL_APNS_KEY_ID | — | Apple Key ID |
+| ADMIRAL_APNS_TEAM_ID | — | Apple Team ID |
+| ADMIRAL_APNS_TOPIC | — | iOS bundle ID |
+| ADMIRAL_APNS_SANDBOX | 1 | Use APNs sandbox (1) or production (0) |
+| ADMIRAL_APNS_DEVICE_TOKEN | — | Target device push token |
+
+## Architecture
+- Single process: FastMCP ASGI app with relay, health, and diagnostics
+  routes appended directly
+- SQLite persistence (data/admiral_mcp/admiral.sqlite3)
+- asyncio.Event for approval blocking/signalling
+- APNs via aioapns (HTTP/2, JWT token auth, .p8 key)
+- Replay protection on approval resolution (SQL WHERE decision IS NULL)
+- Graceful degradation when APNs is not configured
+
+## Security
+- Binds to localhost/Tailscale only — never internet-facing
+- Bearer token on every relay endpoint
+- .p8 key lives outside repo, path from env var
+- Approval IDs are single-use (UUID-based, deleted on resolution)
+- No MCP endpoint exposed beyond localhost
+
+## Port
+- 11089: Backend (MCP + relay + health)
+- 11090: Frontend (Vite dev server, proxies /api → 11089)
+
+Fleet band 10700-11500. Adjacent pair per fleet standard.
+
+## Dashboard
+
+React dashboard at http://127.0.0.1:11090:
+- 4 KPI cards (server, tools, runs, pending approvals)
+- Backend connection dot with health polling (10s interval)
+- Recent runs table with status badges
+- Pending approvals cards
+- Exponential backoff retry (1s→2s→4s→8s→16s)
+- Collapsible sidebar, Ctrl+Scroll zoom
+
+## Just Recipes
+
+| Recipe | Command |
+|--------|---------|
+| `just serve` | Backend only |
+| `just dev` | Backend + Frontend |
+| `just test` | pytest |
+| `just lint` | ruff check + format check |
+| `just fmt` | ruff format |
+| `just tcheck` | TypeScript typecheck |
+| `just mcpb-pack` | Package .mcpb bundle |
+| `just install` | uv sync + bun install |
+
+---
+
+## iOS Client: Admiral Pager — Complete Build Reference
+
+### Cursor Build Prompt (Recommended)
+
+Paste the prompt from README.md §"Zero-to-App: Cursor Build Prompt" into
+Cursor's AI chat on your Mac. It scaffolds the entire project: Xcode
+project configuration, all Swift files (Models/Services/Views), WidgetKit
+extension, notification service extension, entitlements, capabilities,
+and build settings. The prompt is too long to duplicate here — see
+README.md for the full text.
+
+### Machine Setup (Mac)
+
+```bash
+# 1. Apple Developer account
+# https://developer.apple.com — $99/year
+# Required for APNs, code signing, device deployment
+
+# 2. Xcode 27 beta
+brew install xcodesorg/made/xcodes
+xcodes install 27.0b
+sudo xcode-select --switch /Applications/Xcode-27.0b.app
+
+# 3. Cursor or Zed
+brew install --cask cursor   # AI-native, same license as Windows
+brew install --cask zed      # Free, excellent Swift support
+
+# 4. Tailscale
+# Install from https://tailscale.com/download/mac
+# Both machines on same tailnet
+```
+
+### Xcode Project Setup
+
+```
+Bundle ID: ai.fleet.admiral-pager
+Team: your Apple Developer team
+Minimum deployment: iOS 19.0 (or whatever Xcode 27 targets)
+Swift: 6.x
+Interface: SwiftUI
+Lifecycle: SwiftUI App
+
+Capabilities:
+- Push Notifications
+- Live Activities (WidgetKit extension)
+- Background Modes: remote-notification
+```
+
+### APNs Payload Reference
+
+**Actionable alert push** (server sends this via request_approval):
+
+```json
+{
+  "aps": {
+    "alert": {
+      "title": "Approval Needed",
+      "subtitle": "Run: deploy-v2",
+      "body": "Deploy to production?"
+    },
+    "category": "FLEET_APPROVAL",
+    "mutable-content": 1,
+    "badge": 1
+  },
+  "approval_id": "a1b2c3d4",
+  "run_id": "deploy-v2",
+  "diff_ref": "deploy-v2"
+}
+```
+
+**Live Activity update** (server sends via update_progress):
+
+```json
+{
+  "aps": {
+    "timestamp": 1750780000,
+    "event": "update",
+    "content-state": {
+      "run_id": "deploy-v2",
+      "phase": 2,
+      "phase_name": "build",
+      "status": "running",
+      "cost": "$0.14",
+      "total_phases": 4
+    }
+  }
+}
+```
+
+### Required iOS Entitlements
+
+```xml
+<key>aps-environment</key>
+<string>development</string>  <!-- or production -->
+<key>com.apple.developer.pushkit.unrestricted-voip</key>
+<false/>
+```
+
+### Signing Configurations
+
+| Profile | Config | Use |
+|---------|--------|-----|
+| Debug | Auto-managed, development team | Simulator + tethered device |
+| Release | Distribution certificate + provisioning profile | AltStore PAL .ipa |
+
+### AltStore PAL Distribution
+
+EU-only (DMA). Files needed:
+- `admiral-pager.ipa` — exported from Xcode archive
+- `icon.png` — 1024x1024 app icon
+- `source.json` — AltStore PAL source manifest
+
+Source manifest:
+```json
+{
+  "name": "Admiral Pager",
+  "identifier": "ai.fleet.admiral-pager",
+  "apps": [{
+    "bundleIdentifier": "ai.fleet.admiral-pager",
+    "name": "Admiral Pager",
+    "version": "0.1.0",
+    "versionDate": "2026-07-12",
+    "downloadURL": "https://your-cdn.com/admiral-pager.ipa",
+    "size": 5242880,
+    "iconURL": "https://your-cdn.com/icon.png",
+    "screenshotURLs": []
+  }]
+}
+```
+
+### Test on Simulator Without APNs
+
+```bash
+# Send a fake push to simulator
+xcrun simctl push booted ai.fleet.admiral-pager test-push.apns
+
+# test-push.apns:
+# {
+#   "aps": {
+#     "alert": {"title": "Test", "body": "Approval needed"},
+#     "category": "FLEET_APPROVAL"
+#   },
+#   "approval_id": "test-001",
+#   "run_id": "test-run",
+#   "diff_ref": "test-run"
+# }
+```
+
+### End-to-End Test Flow
+
+1. Start admiral-mcp on Windows: `just serve`
+2. Ensure Tailscale is connected on both machines
+3. Build and run iOS app on simulator: `Cmd+R` in Xcode
+4. Copy device token from Xcode console to `ADMIRAL_APNS_DEVICE_TOKEN`
+5. Call `request_approval` from an MCP client
+6. Verify push arrives, tap Approve/Deny
+7. Verify the agent unblocks
+
+### Production Hardening
+
+Before shipping the iOS app:
+- [ ] Obfuscate the relay token (don't hardcode in Swift source — use
+  a build-time env var or xcconfig)
+- [ ] Add certificate pinning for the Tailscale relay endpoint
+- [ ] Add app background refresh to keep the relay connection alive
+- [ ] Add notification when Windows machine is unreachable
+- [ ] Add retry with exponential backoff for relay calls
+- [ ] Archive with distribution (not development) provisioning profile
+- [ ] Test install from AltStore PAL on a real device

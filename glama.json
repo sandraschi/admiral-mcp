@@ -1,0 +1,14 @@
+{
+  "name": "admiral-mcp",
+  "displayName": "Admiral MCP",
+  "version": "0.1.0",
+  "description": "Agent-harness-to-iPhone pager bridge. Lets AI agents page your iPhone for approval and stream job progress via Live Activities.",
+  "author": "Sandra Schipal",
+  "repository": "https://github.com/sandraschi/admiral-mcp",
+  "category": "automation",
+  "tags": ["ios", "apns", "push-notifications", "approval", "live-activities", "agent-harness"],
+  "mcp_server": {
+    "transport": "http",
+    "url": "http://127.0.0.1:11089/mcp"
+  }
+}

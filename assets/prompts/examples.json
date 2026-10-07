@@ -1,0 +1,145 @@
+[
+  {
+    "tool": "register_run",
+    "description": "Announce a new agent job",
+    "examples": [
+      {
+        "args": {
+          "run_id": "deploy-v2",
+          "repo": "plex-mcp",
+          "phases": ["lint", "test", "build", "deploy"],
+          "harness": "opencode"
+        },
+        "expected": { "success": true, "run_id": "deploy-v2" }
+      },
+      {
+        "args": {
+          "run_id": "backup-daily",
+          "repo": "multi-backup-mcp",
+          "phases": ["snapshot", "compress", "upload", "verify"],
+          "harness": "claude-code"
+        },
+        "expected": { "success": true }
+      },
+      {
+        "args": {
+          "run_id": "pr-42",
+          "repo": "email-mcp",
+          "phases": ["checkout", "lint", "test", "merge"],
+          "harness": "opencode"
+        },
+        "expected": { "success": true }
+      }
+    ]
+  },
+  {
+    "tool": "update_progress",
+    "description": "Advance a run phase and push Live Activity update",
+    "examples": [
+      {
+        "args": { "run_id": "deploy-v2", "phase": 0, "cost": 0.0, "status": "running" },
+        "expected": { "success": true, "phase": 0 }
+      },
+      {
+        "args": { "run_id": "deploy-v2", "phase": 1, "cost": 0.07, "status": "running" },
+        "expected": { "success": true, "phase": 1 }
+      },
+      {
+        "args": { "run_id": "deploy-v2", "phase": 3, "cost": 0.21, "status": "complete" },
+        "expected": { "success": true }
+      },
+      {
+        "args": { "run_id": "nonexistent", "phase": 0, "cost": 0.0, "status": "running" },
+        "expected": { "success": false }
+      },
+      {
+        "args": { "run_id": "deploy-v2", "phase": 0, "cost": 0.0, "status": "finished" },
+        "expected": { "success": false }
+      }
+    ]
+  },
+  {
+    "tool": "request_approval",
+    "description": "Request human approval and block until decision",
+    "examples": [
+      {
+        "args": {
+          "run_id": "deploy-v2",
+          "summary": "Deploy to production?",
+          "diff_ref": "deploy-v2",
+          "diff_content": "+ 5 files changed\n- 2 files removed\n~ 1 file modified"
+        },
+        "expected": { "success": true, "decision": "approve" }
+      },
+      {
+        "args": {
+          "run_id": "backup-daily",
+          "summary": "Delete old backups before new snapshot?",
+          "diff_ref": "backup-daily",
+          "diff_content": "- 15 old snapshots would be deleted (recoverable for 30 days)"
+        },
+        "expected": { "success": true, "decision": "approve" }
+      },
+      {
+        "args": {
+          "run_id": "pr-42",
+          "summary": "Merge PR #42: update email template?",
+          "diff_ref": "pr-42"
+        },
+        "expected": { "success": true, "decision": "deny" }
+      },
+      {
+        "args": {
+          "run_id": "nonexistent",
+          "summary": "This should fail",
+          "diff_ref": "no"
+        },
+        "expected": { "success": false }
+      }
+    ]
+  },
+  {
+    "tool": "resolve_approval",
+    "description": "Resolve a pending approval (one-shot, replay protected)",
+    "examples": [
+      {
+        "args": { "approval_id": "a1b2c3d4", "decision": "approve" },
+        "expected": { "success": true, "decision": "approve" }
+      },
+      {
+        "args": { "approval_id": "a1b2c3d4", "decision": "deny" },
+        "expected": { "success": true, "decision": "deny" }
+      },
+      {
+        "args": { "approval_id": "a1b2c3d4", "decision": "approve" },
+        "expected": { "success": false }
+      },
+      {
+        "args": { "approval_id": "fake-id", "decision": "approve" },
+        "expected": { "success": false }
+      },
+      {
+        "args": { "approval_id": "a1b2c3d4", "decision": "maybe" },
+        "expected": { "success": false }
+      }
+    ]
+  },
+  {
+    "tool": "get_diff",
+    "description": "Retrieve stored diff content by reference",
+    "examples": [
+      {
+        "args": { "diff_ref": "deploy-v2" },
+        "expected": { "success": true, "content": "+ 5 files changed\n- 2 files removed\n~ 1 file modified" }
+      },
+      {
+        "args": { "diff_ref": "backup-daily" },
+        "expected": { "success": true }
+      },
+      {
+        "args": { "diff_ref": "does-not-exist" },
+        "expected": { "success": false }
+      }
+    ]
+  }
+]

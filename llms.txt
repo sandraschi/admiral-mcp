@@ -1,0 +1,11 @@
+# admiral-mcp
+
+FastMCP 3.2+ server that lets AI agent harnesses page your iPhone.
+- [llms-full.txt](llms-full.txt) — full tool + API reference
+- [README.md](README.md) — overview and setup
+- [INSTALL.md](INSTALL.md) — quick install
+
+## Quick Links
+- Repo: https://github.com/sandraschi/admiral-mcp
+- MCP transport: `http://127.0.0.1:11089/mcp`
+- Relay REST: `http://127.0.0.1:11089/relay/*`

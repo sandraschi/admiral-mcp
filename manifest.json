@@ -1,0 +1,28 @@
+{
+  "manifest_version": "0.2",
+  "name": "admiral-mcp",
+  "version": "0.1.0",
+  "description": "Agent-harness-to-iPhone pager bridge. Lets AI agent harnesses page your iPhone for approval and stream job progress via Live Activities.",
+  "author": {
+    "name": "Sandra Schipal"
+  },
+  "server": {
+    "type": "python",
+    "entry_point": "src/admiral_mcp/server.py",
+    "mcp_config": {
+      "command": "python",
+      "args": ["-m", "admiral_mcp.server"],
+      "env": {
+        "PYTHONPATH": "${PWD}",
+        "PYTHONUNBUFFERED": "1"
+      }
+    }
+  },
+  "tools": [
+    {"name": "register_run", "description": "Announce a new agent job to the pager"},
+    {"name": "update_progress", "description": "Advance a run phase and push a Live Activity update"},
+    {"name": "request_approval", "description": "Request human approval and block until decision or timeout"},
+    {"name": "resolve_approval", "description": "Resolve a pending approval from the phone callback"},
+    {"name": "get_diff", "description": "Serve diff content to the iOS app by reference"}
+  ]
+}

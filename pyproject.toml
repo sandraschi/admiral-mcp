@@ -1,0 +1,56 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "admiral-mcp"
+version = "0.1.0"
+description = "Agent-harness-to-iPhone pager bridge — FastMCP server with APNs push relay"
+readme = "README.md"
+requires-python = ">=3.12"
+license = {text = "MIT"}
+authors = [
+    {name = "Sandra Schipal", email = "sandraschipal@gmail.com"},
+]
+
+dependencies = [
+    "fastmcp>=3.4.4,<4",
+    "starlette>=1.0.0",
+    "uvicorn[standard]>=0.34.0",
+    "prefab-ui>=0.14.0",
+    "aioapns>=3.2",
+    "pydantic>=2.0",
+    "httpx>=0.28.0",
+]
+
+[project.scripts]
+admiral-mcp = "admiral_mcp.server:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/admiral_mcp"]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.16.0,<0.17",
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24.0",
+    "pywinauto>=0.6.9",
+    "pillow>=12.3.0",
+    "pytesseract>=0.3.13",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+ignore = ["S104", "S310", "S311", "S314", "S608", "S604", "E402", "B008", "B904", "RUF006", "N806", "ANN001", "BLE001", "PLW1510", "S102", "S108", "S202", "SIM115", "SIM117", "E501", "F811", "RUF012", "B027", "B007", "RUF059", "E501"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
