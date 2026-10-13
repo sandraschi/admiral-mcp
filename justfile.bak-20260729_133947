@@ -1,0 +1,28 @@
+set windows-shell := ["powershell.exe", "-NoProfile", "-Command"]
+
+serve:
+    $env:PYTHONPATH = "src"; uv run python -m admiral_mcp.server
+
+dev:
+    uv run python -m admiral_mcp.server &
+    bun --cwd webapp run dev
+
+test:
+    uv run pytest tests/ -v
+
+lint:
+    uv run ruff check src/ tests/
+    uv run ruff format --check src/ tests/
+
+fmt:
+    uv run ruff format src/ tests/
+
+tcheck:
+    bunx --cwd webapp tsc --noEmit
+
+mcpb-pack:
+    mcpb pack . dist/admiral-mcp-v0.1.0.mcpb
+
+install:
+    uv sync
+    bun --cwd webapp install
